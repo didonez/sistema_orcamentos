@@ -3,21 +3,19 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
-import base64
-import json
 
-# --- 1. CONFIGURAÇÃO DE AUTENTICAÇÃO VIA RECONSTRUÇÃO EM MEMÓRIA ---
+# --- 1. CONFIGURAÇÃO DE AUTENTICAÇÃO DIRETA (GOOGLE SHEETS) ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 try:
-    # Coleta a string em Base64 do painel de Secrets
-    encoded_json = st.secrets["gcp_service_account"]["json_base64"]
+    # Lê as credenciais diretamente do dicionário do Streamlit Secrets
+    creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # Decodifica e reconstrói o JSON original exatamente como foi gerado pelo Google
-    decoded_json_bytes = base64.b64decode(encoded_json)
-    creds_dict = json.loads(decoded_json_bytes.decode("utf-8"))
+    # Garante que as quebras de linha da chave privada estão corretas na memória
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     
-    # Inicializa a conexão nativa com o ecossistema Google
+    # Inicializa a conexão com o ecossistema Google
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     
@@ -29,10 +27,10 @@ try:
     
 except gspread.exceptions.SpreadsheetNotFound:
     st.error(f"❌ Erro: A planilha '{nome_planilha}' não foi encontrada no Google Drive.")
-    st.info("💡 **Como resolver:** Certifique-se de que compartilhou a planilha com o e-mail da Conta de Serviço como Editor.")
+    st.info("💡 **Como resolver:** Certifique-se de que partilhou a planilha com o e-mail da Conta de Serviço como Editor.")
     st.stop()
 except Exception as e:
-    st.error("❌ Erro Crítico de Autenticação na decodificação do JSON.")
+    st.error("❌ Erro Crítico de Autenticação.")
     st.code(str(e))
     st.stop()
 
@@ -42,11 +40,15 @@ st.title("📄 Sistema de Orçamentos & OS")
 st.subheader("Integração Inteligente PC & Smartphone")
 
 # Carregar dados existentes do Banco de Dados do Sheets para o Auto-completar
-df_db = pd.DataFrame(db_sheet.get_all_records())
-if not df_db.empty and "Nome do Item / Serviço" in df_db.columns:
-    lista_itens_existentes = df_db["Nome do Item / Serviço"].tolist()
-else:
+try:
+    df_db = pd.DataFrame(db_sheet.get_all_records())
+    if not df_db.empty and "Nome do Item / Serviço" in df_db.columns:
+        lista_itens_existentes = df_db["Nome do Item / Serviço"].tolist()
+    else:
+        lista_itens_existentes = []
+except Exception:
     lista_itens_existentes = []
+    df_db = pd.DataFrame()
 
 # Dados do Cliente
 col1, col2 = st.columns(2)
@@ -74,7 +76,11 @@ if item_selecionado == "-- Novo Item --":
 else:
     nome_item = item_selecionado
     # Busca o preço cadastrado na planilha automaticamente
-    preco_sugerido = float(df_db[df_db["Nome do Item / Serviço"] == item_selecionado]["Preço Padrão (R$)"].values[0])
+    try:
+        match_preco = df_db[df_db["Nome do Item / Serviço"] == item_selecionado]["Preço Padrão (R$)"].values
+        preco_sugerido = float(match_preco[0]) if len(match_preco) > 0 else 0.0
+    except Exception:
+        preco_sugerido = 0.0
     st.info(f"Preço padrão encontrado: R$ {preco_sugerido:.2f}")
 
 qtd = st.number_input("Quantidade:", min_value=1, value=1, step=1)
@@ -91,8 +97,11 @@ if st.button("➕ Adicionar Item ao Orçamento"):
         
         # Se for um item novo, envia automaticamente para a aba Banco de Dados
         if item_selecionado == "-- Novo Item --" and nome_item not in lista_itens_existentes:
-            db_sheet.append_row([nome_item, preco_sugerido])
-            st.success(f"'{nome_item}' foi aprendido e salvo no seu Banco de Dados para as próximas vezes!")
+            try:
+                db_sheet.append_row([nome_item, preco_sugerido])
+                st.success(f"'{nome_item}' foi aprendido e salvo no seu Banco de Dados!")
+            except Exception as err:
+                st.warning(f"Item adicionado à sessão, mas houve um erro ao salvar no Sheets: {err}")
         st.rerun()
 
 
@@ -107,22 +116,25 @@ if st.session_state.itens_orcamento:
     # --- 4. FINALIZAÇÃO E EXPORTAÇÃO CONTRA O SHEETS & WHATSAPP ---
     st.markdown("---")
     if st.button("💾 Finalizar e Enviar para o Google Sheets"):
-        # Salva as informações principais do orçamento na planilha
-        for item in st.session_state.itens_orcamento:
-            os_sheet.append_row([
-                datetime.now().strftime("%d/%m/%Y %H:%M"),
-                cliente,
-                whatsapp,
-                item["Descrição"],
-                item["Qtd"],
-                item["Valor Unit."],
-                item["Total"],
-                valor_total_geral
-            ])
+        try:
+            for item in st.session_state.itens_orcamento:
+                os_sheet.append_row([
+                    datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    cliente,
+                    whatsapp,
+                    item["Descrição"],
+                    item["Qtd"],
+                    item["Valor Unit."],
+                    item["Total"],
+                    valor_total_geral
+                ])
+                
+            st.success("Orçamento salvo com sucesso no Google Sheets!")
             
-        st.success("Orçamento salvo com sucesso no Google Sheets!")
-        
-        # Gera o link direto de envio do texto estruturado para o WhatsApp
-        texto_zap = f"Olá {cliente}, seu orçamento ficou pronto no valor total de R$ {valor_total_geral:.2f}."
-        link_whatsapp = f"https://wa.me/55{whatsapp}?text={texto_zap.replace(' ', '%20')}"
-        st.markdown(f"[📲 Enviar via WhatsApp]({link_whatsapp})")
+            # Gera o link direto de envio do texto estruturado para o WhatsApp
+            if whatsapp:
+                texto_zap = f"Olá {cliente}, seu orçamento ficou pronto no valor total de R$ {valor_total_geral:.2f}."
+                link_whatsapp = f"https://wa.me/55{whatsapp}?text={texto_zap.replace(' ', '%20')}"
+                st.markdown(f"[📲 Enviar via WhatsApp]({link_whatsapp})")
+        except Exception as e:
+            st.error(f"Erro ao salvar na aba de Orçamento: {e}")
