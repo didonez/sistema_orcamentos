@@ -18,14 +18,20 @@ try:
     creds = Credentials.from_service_account_info(secret_info, scopes=scope)
     client = gspread.authorize(creds)
     
-    # Abre a planilha do Google pelo nome
-    spreadsheet = client.open("Modelo_Orcamento_Inteligente")
+    # Tenta abrir a planilha do Google pelo nome exato
+    nome_planilha = "Modelo_Orcamento_Inteligente"
+    spreadsheet = client.open(nome_planilha)
     db_sheet = spreadsheet.worksheet("Banco de Dados")
     os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
     
+except gspread.exceptions.SpreadsheetNotFound:
+    st.error(f"❌ Erro: A planilha '{nome_planilha}' não foi encontrada no Google Drive.")
+    st.info("💡 **Como resolver:** Vá no seu Google Sheets e verifique se o nome está idêntico. Além disso, certifique-se de que você clicou em **Compartilhar** na planilha e adicionou o e-mail abaixo como **Editor**:\n\n`python-sheets@didodnes.iam.gserviceaccount.com`")
+    st.stop()
 except Exception as e:
-    st.error("Erro Crítico de Autenticação/Conexão com o Google Sheets.")
-    st.info("Verifique se as Secrets estão salvas no painel e se o nome da Planilha está correto.")
+    st.error("❌ Erro Crítico de Autenticação com as Secrets.")
+    st.code(str(e))
+    st.info("Verifique se o bloco das Secrets no painel do Streamlit está preenchido corretamente.")
     st.stop()
 
 # --- Interface do Aplicativo Streamlit ---
@@ -95,7 +101,6 @@ if st.session_state.itens_orcamento:
     # 4. Finalização e Exportação
     st.markdown("---")
     if st.button("💾 Finalizar e Enviar para o Google Sheets"):
-        # Mensagem de sucesso ao salvar
         st.success("Orçamento salvo com sucesso no Google Sheets!")
         
         # Cria link direto para o cliente via WhatsApp com texto pronto
