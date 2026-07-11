@@ -1,19 +1,10 @@
 import streamlit as st
 import gspread
+import pandas as pd
 from google.oauth2.service_account import Credentials
+from datetime import datetime
 
-# Carrega do Secrets (não precisamos do ficheiro JSON no GitHub)
-creds_dict = st.secrets["gcp_service_account"]
-
-# Conecta
-creds = Credentials.from_service_account_info(
-    creds_dict, 
-    scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-)
-client = gspread.authorize(creds)
-
-# --- 1. CONFIGURAÇÃO SEGURA DAS CREDENCIAIS ---
-# As credenciais estão injetadas diretamente para evitar erros de leitura de arquivos no GitHub
+# --- CONFIGURAÇÃO DE CREDENCIAIS (Injetada diretamente para máxima estabilidade) ---
 SERVICE_ACCOUNT_INFO = {
     "type": "service_account",
     "project_id": "didodnes",
@@ -24,30 +15,24 @@ SERVICE_ACCOUNT_INFO = {
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
     "token_uri": "https://oauth2.googleapis.com/token",
     "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/sistema-orcamento%40didodnes.iam.gserviceaccount.com",
-    "universe_domain": "googleapis.com"
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/sistema-orcamento%40didodnes.iam.gserviceaccount.com"
 }
 
-# --- 2. CONEXÃO COM O GOOGLE SHEETS ---
-try:
-    creds = Credentials.from_service_account_info(
-        SERVICE_ACCOUNT_INFO, 
-        scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    )
-    client = gspread.authorize(creds)
-    spreadsheet = client.open("Modelo_Orcamento_Inteligente")
-    db_sheet = spreadsheet.worksheet("Banco de Dados")
-    os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
-except Exception as e:
-    st.error(f"Erro na conexão com o Google: {e}")
-    st.stop()
+# --- CONEXÃO COM O GOOGLE SHEETS ---
+creds = Credentials.from_service_account_info(
+    SERVICE_ACCOUNT_INFO, 
+    scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+)
+client = gspread.authorize(creds)
+spreadsheet = client.open("Modelo_Orcamento_Inteligente")
+db_sheet = spreadsheet.worksheet("Banco de Dados")
+os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
 
-# --- 3. INTERFACE DO APP ---
-st.title("📄 Sistema de Orçamentos & OS")
+# --- INTERFACE ---
+st.title("📄 Sistema de Orçamentos")
 
-# Carrega lista de itens para auto-completar
 df_db = pd.DataFrame(db_sheet.get_all_records())
-lista_itens = df_db["Nome do Item / Serviço"].tolist() if not df_db.empty else []
+lista_itens = df_db["Nome do Item / Serviço"].tolist()
 
 cliente = st.text_input("Nome do Cliente:")
 whatsapp = st.text_input("WhatsApp do Cliente:")
@@ -57,29 +42,25 @@ if "itens" not in st.session_state: st.session_state.itens = []
 item_sel = st.selectbox("Selecione o item:", ["-- Novo Item --"] + lista_itens)
 
 if item_sel == "-- Novo Item --":
-    nome_item = st.text_input("Nome do novo equipamento ou serviço:")
-    preco = st.number_input("Preço Unitário (R$):", value=0.0, step=10.0)
+    nome_item = st.text_input("Nome do novo item:")
+    preco = st.number_input("Preço:", value=0.0)
 else:
     nome_item = item_sel
     preco = float(df_db[df_db["Nome do Item / Serviço"] == item_sel]["Preço Padrão (R$)"].values[0])
 
-qtd = st.number_input("Quantidade:", value=1, min_value=1)
+qtd = st.number_input("Qtd:", value=1)
 
-if st.button("➕ Adicionar Item"):
+if st.button("➕ Adicionar"):
     st.session_state.itens.append({"Desc": nome_item, "Qtd": qtd, "Preco": preco, "Total": qtd*preco})
     if item_sel == "-- Novo Item --": 
         db_sheet.append_row([nome_item, preco])
     st.rerun()
 
-# --- 4. EXIBIÇÃO E SALVAMENTO ---
 if st.session_state.itens:
-    df_orc = pd.DataFrame(st.session_state.itens)
-    st.table(df_orc)
-    st.write(f"### 💰 Total Geral: R$ {df_orc['Total'].sum():.2f}")
-    
-    if st.button("💾 Finalizar Orçamento"):
+    st.table(pd.DataFrame(st.session_state.itens))
+    if st.button("💾 Finalizar"):
         for i in st.session_state.itens:
             os_sheet.append_row([datetime.now().strftime("%d/%m/%Y"), cliente, whatsapp, i["Desc"], i["Qtd"], i["Preco"], i["Total"]])
-        st.success("Orçamento salvo no Google Sheets!")
+        st.success("Salvo!")
         st.session_state.itens = []
         st.rerun()
