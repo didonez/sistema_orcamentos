@@ -4,21 +4,21 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# 1. Configuração da Conexão Blindada com o Google Sheets
+# 1. Configuração da Conexão Inteligente com o Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 try:
-    # Transforma o st.secrets em um dicionário Python tratável
+    # Puxa os dados simples vindos das Secrets
     secret_info = dict(st.secrets["gcp_service_account"])
     
-    # Corrige a string da chave privada substituindo barras literais por quebras de linha reais
-    secret_info["private_key"] = secret_info["private_key"].replace("\\n", "\n")
+    # Injeta a chave privada direto pelo Python, evitando erros de quebra de linha no TOML
+    secret_info["private_key"] = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCtO55nDEt1oOV6\nYcncIQSiDWFW1OtqI366O1FPMwnJy2N6xqufC9j4dvg5Ij5BW+oe8p1tDgLoUBbj\nX+/pnDAlnuMUNk9gBG5BxFF9IJGbjQFvQmYBLiwVeFYB0ssAj1aChsgtaQgPioD9\nyG4YVVvcSrUIQVmjMG8O6iflG4uCpmA9LvZKlDi0QXDP+xNABuv0kdvQCjXW/xLH\nO2Qb/ijXHZ0vjFPoLJBx6JGMRGN9+e7gYkLZGnULu7HZf4YR19cfumqrET2GV6C9\ndBqwB7SfNeObeQKz97WLJyTZc+6tQLLlOiq5vQe2kHrqt8lCWp2wqM5xJs8jV3HO\n3eZgdtkhAgMBAAECggEABshnoQ8qnfckHxLowIhQLjBuDhRhiJcN02jGy+4imSqw\nGSbB4eUIzH87hECsjXp15/rtyi8nEt2ubL4VFql7euCeEWy4NkksIEH5oxepLd0T\nOB4SYIPUXO2YmAMO+OVT4MHaYQlMlA+zMeSk92nRskYgURu+cNDg21WUpPBLecy9\nfFkWDiHvOq5w8Yy7E+nQ8s+bRfnfAiIvWCtRrj8rWsXiuP60a6AaqW2gBfJjPcIC\nXF5sf+zyFvjGIr1sXgGvwDom+ujfTnEmlBtI8QbmtWruFlbEt6+od6zEBS0JwiAv\ntSAS5gXK5jSHKgO8E3+NFXg9TncQ1EMyKwTSiG6VEQKBgQDjOTO7VfM+gpjSWLOg\quS0/liLhlkw9Azd/3gJz5sgN60A8RFVc76t/SCp9Z0j2fO76xA4HW95O4RKJjsi\nvECjEejL3UcxjM5s0rRRJ+4hCsuS+A2uv7uYpyGwBqukjyhhIxlcISQiCU7KMlUk\nwk/8Q7UgdNu1Lw0p4bUgXvpBUQKBgQDDK/3u/q5Y07hoGHlCuA/A5CYQMzrwEqUk\nENR4kFp4BWF1ipnne4D3iMYJ9l9/7IcINyekmj1yoLLm4QJYoRND2abs+zV9TmIP\n65X5piT9B4XH3EFdjGF1hCsyjHSht/4JKVyehniYD5GNP//RSiAPIejlc9RNpI0t\n8pwdJ72m0QKBgQCj49BiYN4vyja8EWqOinSn74SiLmcKnhzhyrAkM2/qTv4j3bzo\n67EvAZKbxCJxh3T7p9JtBx4uTTVf3i9tIGdmtzY4RQRiwvLpHxkcKDbj8ktfWDdW\nQcjnlDUCJ+2JphAz8AMMpoLPYfNIeAFdoCHdDGEKZf9KsgNGoBvqm1bZ4QKBgHw8\n5rpaGLWmoH5zBc24yR5qnOg3FE96LvFUXUwZ59z6390oy2uVLLVltVrmIEiYUiSi\np3OaU39CWF+r4Ah3EIJibGXyS0xmtvmXZ7KxVl5TiY9934YjNG7QIYdd7Wh8bRN7\n5t9qjh2N24Nkt/2MB/haB5z4LK74Dn6vLz1H7OvhAoGBANR/7z3eY6+sox4q9Rg5\nLtqkDC39yWOQfaiWxHhDG52+XwGBkhM3sgabLUhZawIhjbB3ejpRvWibebwrn4OR\nGf8mSfs4NL0XfsWYzWUhj53j72pxenj5TP+myqUsF74czeuHqn1hlyLj2RZiDbVE\n1E7jbPJNp6NeTrXDn+G0uNUF\n-----END PRIVATE KEY-----\n"
     
-    # Autentica no Google com os dados higienizados
+    # Autentica no Google
     creds = Credentials.from_service_account_info(secret_info, scopes=scope)
     client = gspread.authorize(creds)
     
-    # Tenta abrir a planilha do Google pelo nome exato
+    # Abre a planilha do Google pelo nome exato
     nome_planilha = "Modelo_Orcamento_Inteligente"
     spreadsheet = client.open(nome_planilha)
     db_sheet = spreadsheet.worksheet("Banco de Dados")
@@ -26,12 +26,11 @@ try:
     
 except gspread.exceptions.SpreadsheetNotFound:
     st.error(f"❌ Erro: A planilha '{nome_planilha}' não foi encontrada no Google Drive.")
-    st.info("💡 **Como resolver:** Vá no seu Google Sheets e verifique se o nome está idêntico. Além disso, certifique-se de que você clicou em **Compartilhar** na planilha e adicionou o e-mail abaixo como **Editor**:\n\n`python-sheets@didodnes.iam.gserviceaccount.com`")
+    st.info("💡 **Como resolver:** Certifique-se de que você clicou em **Compartilhar** na planilha do Google Sheets e adicionou o e-mail abaixo como **Editor**:\n\n`python-sheets@didodnes.iam.gserviceaccount.com`")
     st.stop()
 except Exception as e:
-    st.error("❌ Erro Crítico de Autenticação com as Secrets.")
+    st.error("❌ Erro de Configuração interna.")
     st.code(str(e))
-    st.info("Verifique se o bloco das Secrets no painel do Streamlit está preenchido corretamente.")
     st.stop()
 
 # --- Interface do Aplicativo Streamlit ---
@@ -84,7 +83,6 @@ if st.button("➕ Adicionar Item ao Orçamento"):
             "Total": total_item
         })
         
-        # Se for um item novo, salva automaticamente de volta no Banco de Dados do Google Sheets
         if item_selecionado == "-- Novo Item --" and nome_item not in lista_itens_existentes:
             db_sheet.append_row([nome_item, preco_sugerido])
             st.success(f"'{nome_item}' foi aprendido e salvo no seu Banco de Dados para as próximas vezes!")
@@ -103,7 +101,6 @@ if st.session_state.itens_orcamento:
     if st.button("💾 Finalizar e Enviar para o Google Sheets"):
         st.success("Orçamento salvo com sucesso no Google Sheets!")
         
-        # Cria link direto para o cliente via WhatsApp com texto pronto
         texto_zap = f"Olá {cliente}, seu orçamento ficou pronto no valor total de R$ {valor_total_geral:.2f}."
         link_whatsapp = f"https://wa.me/55{whatsapp}?text={texto_zap.replace(' ', '%20')}"
         st.markdown(f"[📲 Enviar via WhatsApp]({link_whatsapp})")
