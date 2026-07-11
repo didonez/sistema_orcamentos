@@ -6,8 +6,12 @@ from datetime import datetime
 
 # 1. Configuração da Conexão com o Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-# No Streamlit Cloud, você coloca suas credenciais de forma segura em st.secrets
-creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+
+# AJUSTE DA LINHA 10: Garante que as quebras de linha da chave privada sejam interpretadas corretamente
+secret_info = dict(st.secrets["gcp_service_account"])
+secret_info["private_key"] = secret_info["private_key"].replace("\\n", "\n")
+
+creds = Credentials.from_service_account_info(secret_info, scopes=scope)
 client = gspread.authorize(creds)
 
 # Abra a sua planilha do Google pelo nome ou ID
