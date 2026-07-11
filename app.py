@@ -1,9 +1,16 @@
 import streamlit as st
 import gspread
-import pandas as pd
-import json
-from datetime import datetime
 from google.oauth2.service_account import Credentials
+
+# Carrega do Secrets (não precisamos do ficheiro JSON no GitHub)
+creds_dict = st.secrets["gcp_service_account"]
+
+# Conecta
+creds = Credentials.from_service_account_info(
+    creds_dict, 
+    scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+)
+client = gspread.authorize(creds)
 
 # --- 1. CONFIGURAÇÃO SEGURA DAS CREDENCIAIS ---
 # As credenciais estão injetadas diretamente para evitar erros de leitura de arquivos no GitHub
