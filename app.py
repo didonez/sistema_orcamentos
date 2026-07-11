@@ -1,26 +1,27 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
 import pandas as pd
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# 1. Configuração da Autenticação via Secrets
-# O Streamlit lê o TOML que você configurou no painel de Secrets
-creds = Credentials.from_service_account_info(
-    st.secrets,
-    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-)
-client = gspread.authorize(creds)
+# 1. Configuração da Autenticação
+# Usamos st.secrets para carregar as credenciais de forma segura e estável
+def get_client():
+    creds = Credentials.from_service_account_info(
+        st.secrets,
+        scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    )
+    return gspread.authorize(creds)
 
-# 2. Acesso à planilha pelo ID (Use o ID: 1zFziJ1eXlaTAS8cFavalmCBWwEkdaPHD)
+# 2. Inicialização
+client = get_client()
 spreadsheet = client.open_by_key("1zFziJ1eXlaTAS8cFavalmCBWwEkdaPHD")
 db_sheet = spreadsheet.worksheet("Banco de Dados")
 os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
 
-# 3. Interface do App
+# 3. Interface e Lógica
 st.title("📄 Sistema de Orçamentos")
 
-# Carregar dados
 df_db = pd.DataFrame(db_sheet.get_all_records())
 lista_itens = df_db["Nome do Item / Serviço"].tolist()
 
