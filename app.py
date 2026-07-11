@@ -3,138 +3,68 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
+import base64
+import json
 
-# --- 1. CONFIGURAÇÃO DE AUTENTICAÇÃO DIRETA (GOOGLE SHEETS) ---
+# 1. AUTENTICAÇÃO BLINDADA
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 try:
-    # Lê as credenciais diretamente do dicionário do Streamlit Secrets
-    creds_dict = dict(st.secrets["gcp_service_account"])
+    # Decodifica o Base64 diretamente para um dicionário
+    encoded_json = st.secrets["gcp_service_account"]["json_base64"]
+    creds_dict = json.loads(base64.b64decode(encoded_json))
     
-    # Garante que as quebras de linha da chave privada estão corretas na memória
-    if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    
-    # Inicializa a conexão com o ecossistema Google
+    # Autoriza
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     
-    # Abre a planilha do Google pelos nomes exatos das abas
+    # Conecta às abas
     nome_planilha = "Modelo_Orcamento_Inteligente"
     spreadsheet = client.open(nome_planilha)
     db_sheet = spreadsheet.worksheet("Banco de Dados")
     os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
     
-except gspread.exceptions.SpreadsheetNotFound:
-    st.error(f"❌ Erro: A planilha '{nome_planilha}' não foi encontrada no Google Drive.")
-    st.info("💡 **Como resolver:** Certifique-se de que partilhou a planilha com o e-mail da Conta de Serviço como Editor.")
-    st.stop()
 except Exception as e:
-    st.error("❌ Erro Crítico de Autenticação.")
-    st.code(str(e))
+    st.error(f"Erro na conexão: {e}")
     st.stop()
 
+# 2. INTERFACE
+st.title("📄 Sistema de Orçamentos")
 
-# --- 2. INTERFACE DO APLICATIVO STREAMLIT ---
-st.title("📄 Sistema de Orçamentos & OS")
-st.subheader("Integração Inteligente PC & Smartphone")
+# Carregar dados
+df_db = pd.DataFrame(db_sheet.get_all_records())
+lista_itens = df_db["Nome do Item / Serviço"].tolist() if not df_db.empty else []
 
-# Carregar dados existentes do Banco de Dados do Sheets para o Auto-completar
-try:
-    df_db = pd.DataFrame(db_sheet.get_all_records())
-    if not df_db.empty and "Nome do Item / Serviço" in df_db.columns:
-        lista_itens_existentes = df_db["Nome do Item / Serviço"].tolist()
-    else:
-        lista_itens_existentes = []
-except Exception:
-    lista_itens_existentes = []
-    df_db = pd.DataFrame()
+cliente = st.text_input("Nome do Cliente:")
+whatsapp = st.text_input("WhatsApp do Cliente:")
 
-# Dados do Cliente
-col1, col2 = st.columns(2)
-with col1:
-    cliente = st.text_input("Nome do Cliente:")
-with col2:
-    whatsapp = st.text_input("WhatsApp do Cliente (com DDD):")
+if "itens" not in st.session_state: st.session_state.itens = []
 
-st.markdown("---")
-st.write("### 🛒 Itens do Orçamento")
+item_sel = st.selectbox("Selecione o item:", ["-- Novo Item --"] + lista_itens)
 
-# Inicializa a lista de itens na sessão do app se não existir
-if "itens_orcamento" not in st.session_state:
-    st.session_state.itens_orcamento = []
-
-# Campo de seleção/auto-completar dinâmico
-item_selecionado = st.selectbox(
-    "Selecione ou digite um Equipamento/Serviço (Auto-completar):",
-    options=["-- Novo Item --"] + lista_itens_existentes
-)
-
-if item_selecionado == "-- Novo Item --":
-    nome_item = st.text_input("Digite o nome do novo equipamento ou serviço:")
-    preco_sugerido = st.number_input("Preço Unitário (R$):", min_value=0.0, value=0.0, step=10.0)
+if item_sel == "-- Novo Item --":
+    nome_item = st.text_input("Nome do item:")
+    preco = st.number_input("Preço:", value=0.0)
 else:
-    nome_item = item_selecionado
-    # Busca o preço cadastrado na planilha automaticamente
-    try:
-        match_preco = df_db[df_db["Nome do Item / Serviço"] == item_selecionado]["Preço Padrão (R$)"].values
-        preco_sugerido = float(match_preco[0]) if len(match_preco) > 0 else 0.0
-    except Exception:
-        preco_sugerido = 0.0
-    st.info(f"Preço padrão encontrado: R$ {preco_sugerido:.2f}")
+    nome_item = item_sel
+    preco = float(df_db[df_db["Nome do Item / Serviço"] == item_sel]["Preço Padrão (R$)"].values[0])
 
-qtd = st.number_input("Quantidade:", min_value=1, value=1, step=1)
-total_item = qtd * preco_sugerido
+qtd = st.number_input("Qtd:", value=1)
 
-if st.button("➕ Adicionar Item ao Orçamento"):
-    if nome_item:
-        st.session_state.itens_orcamento.append({
-            "Descrição": nome_item,
-            "Qtd": qtd,
-            "Valor Unit.": preco_sugerido,
-            "Total": total_item
-        })
-        
-        # Se for um item novo, envia automaticamente para a aba Banco de Dados
-        if item_selecionado == "-- Novo Item --" and nome_item not in lista_itens_existentes:
-            try:
-                db_sheet.append_row([nome_item, preco_sugerido])
-                st.success(f"'{nome_item}' foi aprendido e salvo no seu Banco de Dados!")
-            except Exception as err:
-                st.warning(f"Item adicionado à sessão, mas houve um erro ao salvar no Sheets: {err}")
-        st.rerun()
+if st.button("➕ Adicionar"):
+    st.session_state.itens.append({"Desc": nome_item, "Qtd": qtd, "Preco": preco, "Total": qtd*preco})
+    if item_sel == "-- Novo Item --": 
+        db_sheet.append_row([nome_item, preco])
+    st.rerun()
 
-
-# --- 3. EXIBIÇÃO DOS ITENS E SOMA TOTAL ---
-if st.session_state.itens_orcamento:
-    df_atual = pd.DataFrame(st.session_state.itens_orcamento)
-    st.table(df_atual)
+# 3. EXIBIÇÃO E SALVAMENTO
+if st.session_state.itens:
+    df_orc = pd.DataFrame(st.session_state.itens)
+    st.table(df_orc)
+    st.write(f"### Total: R$ {df_orc['Total'].sum():.2f}")
     
-    valor_total_geral = df_atual["Total"].sum()
-    st.markdown(f"## 💰 Valor Total Geral: **R$ {valor_total_geral:.2f}**")
-    
-    # --- 4. FINALIZAÇÃO E EXPORTAÇÃO CONTRA O SHEETS & WHATSAPP ---
-    st.markdown("---")
-    if st.button("💾 Finalizar e Enviar para o Google Sheets"):
-        try:
-            for item in st.session_state.itens_orcamento:
-                os_sheet.append_row([
-                    datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    cliente,
-                    whatsapp,
-                    item["Descrição"],
-                    item["Qtd"],
-                    item["Valor Unit."],
-                    item["Total"],
-                    valor_total_geral
-                ])
-                
-            st.success("Orçamento salvo com sucesso no Google Sheets!")
-            
-            # Gera o link direto de envio do texto estruturado para o WhatsApp
-            if whatsapp:
-                texto_zap = f"Olá {cliente}, seu orçamento ficou pronto no valor total de R$ {valor_total_geral:.2f}."
-                link_whatsapp = f"https://wa.me/55{whatsapp}?text={texto_zap.replace(' ', '%20')}"
-                st.markdown(f"[📲 Enviar via WhatsApp]({link_whatsapp})")
-        except Exception as e:
-            st.error(f"Erro ao salvar na aba de Orçamento: {e}")
+    if st.button("💾 Finalizar"):
+        for i in st.session_state.itens:
+            os_sheet.append_row([datetime.now().strftime("%d/%m/%Y"), cliente, whatsapp, i["Desc"], i["Qtd"], i["Preco"], i["Total"]])
+        st.success("Salvo!")
+        st.session_state.itens = []
