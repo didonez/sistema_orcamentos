@@ -4,31 +4,31 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# 1. AUTENTICAÇÃO USANDO O ARQUIVO NO REPOSITÓRIO
+# --- 1. CONFIGURAÇÃO DE CONEXÃO (Lendo o arquivo local) ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 try:
-    # O arquivo service-account.json deve estar na mesma pasta que o app.py no GitHub
+    # Lê o arquivo que você subiu para o GitHub
     creds = Credentials.from_service_account_file("service-account.json", scopes=scope)
     client = gspread.authorize(creds)
     
-    # Conecta às abas
-    nome_planilha = "Modelo_Orcamento_Inteligente"
-    spreadsheet = client.open(nome_planilha)
+    # Abre a planilha
+    spreadsheet = client.open("Modelo_Orcamento_Inteligente")
     db_sheet = spreadsheet.worksheet("Banco de Dados")
     os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
     
 except Exception as e:
-    st.error(f"Erro na conexão com o arquivo JSON: {e}")
+    st.error(f"Erro ao conectar com service-account.json: {e}")
     st.stop()
 
-# 2. INTERFACE
-st.title("📄 Sistema de Orçamentos")
+# --- 2. INTERFACE DO APP ---
+st.title("📄 Sistema de Orçamentos & OS")
 
-# Carregar dados
+# Carregar dados do Banco
 df_db = pd.DataFrame(db_sheet.get_all_records())
 lista_itens = df_db["Nome do Item / Serviço"].tolist() if not df_db.empty else []
 
+# Inputs
 cliente = st.text_input("Nome do Cliente:")
 whatsapp = st.text_input("WhatsApp do Cliente:")
 
@@ -51,7 +51,7 @@ if st.button("➕ Adicionar"):
         db_sheet.append_row([nome_item, preco])
     st.rerun()
 
-# 3. EXIBIÇÃO E SALVAMENTO
+# --- 3. EXIBIÇÃO E FINALIZAÇÃO ---
 if st.session_state.itens:
     df_orc = pd.DataFrame(st.session_state.itens)
     st.table(df_orc)
@@ -60,5 +60,6 @@ if st.session_state.itens:
     if st.button("💾 Finalizar"):
         for i in st.session_state.itens:
             os_sheet.append_row([datetime.now().strftime("%d/%m/%Y"), cliente, whatsapp, i["Desc"], i["Qtd"], i["Preco"], i["Total"]])
-        st.success("Salvo!")
+        st.success("Orçamento salvo com sucesso!")
         st.session_state.itens = []
+        st.rerun()
