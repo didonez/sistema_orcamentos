@@ -3,16 +3,19 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
+import base64
+import json
 
-# --- 1. CONFIGURAÇÃO DE AUTENTICAÇÃO (GOOGLE SHEETS) ---
+# --- 1. CONFIGURAÇÃO DE AUTENTICAÇÃO VIA RECONSTRUÇÃO EM MEMÓRIA ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 try:
-    # Coleta o dicionário das credenciais salvas no painel de Secrets do Streamlit
-    creds_dict = dict(st.secrets["gcp_service_account"])
+    # Coleta a string em Base64 do painel de Secrets
+    encoded_json = st.secrets["gcp_service_account"]["json_base64"]
     
-    # Trata de forma limpa as quebras de linha na memória do Python
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    # Decodifica e reconstrói o JSON original exatamente como foi gerado pelo Google
+    decoded_json_bytes = base64.b64decode(encoded_json)
+    creds_dict = json.loads(decoded_json_bytes.decode("utf-8"))
     
     # Inicializa a conexão nativa com o ecossistema Google
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
@@ -29,7 +32,7 @@ except gspread.exceptions.SpreadsheetNotFound:
     st.info("💡 **Como resolver:** Certifique-se de que compartilhou a planilha com o e-mail da Conta de Serviço como Editor.")
     st.stop()
 except Exception as e:
-    st.error("❌ Erro Crítico de Autenticação.")
+    st.error("❌ Erro Crítico de Autenticação na decodificação do JSON.")
     st.code(str(e))
     st.stop()
 
