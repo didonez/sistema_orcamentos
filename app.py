@@ -3,19 +3,13 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
-import base64
-import json
 
-# 1. AUTENTICAÇÃO BLINDADA
+# 1. AUTENTICAÇÃO USANDO O ARQUIVO NO REPOSITÓRIO
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 try:
-    # Decodifica o Base64 diretamente para um dicionário
-    encoded_json = st.secrets["gcp_service_account"]["json_base64"]
-    creds_dict = json.loads(base64.b64decode(encoded_json))
-    
-    # Autoriza
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    # O arquivo service-account.json deve estar na mesma pasta que o app.py no GitHub
+    creds = Credentials.from_service_account_file("service-account.json", scopes=scope)
     client = gspread.authorize(creds)
     
     # Conecta às abas
@@ -25,7 +19,7 @@ try:
     os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
     
 except Exception as e:
-    st.error(f"Erro na conexão: {e}")
+    st.error(f"Erro na conexão com o arquivo JSON: {e}")
     st.stop()
 
 # 2. INTERFACE
