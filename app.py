@@ -1,16 +1,12 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# --- 1. CONFIGURAÇÃO DE CONEXÃO (Lendo o arquivo local) ---
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
+# --- 1. CONEXÃO DIRETA (O MODO MAIS ESTÁVEL) ---
 try:
-    # Lê o arquivo que você subiu para o GitHub
-    creds = Credentials.from_service_account_file("service-account.json", scopes=scope)
-    client = gspread.authorize(creds)
+    # Este comando lê o arquivo service-account.json automaticamente da pasta raiz
+    client = gspread.service_account(filename="service-account.json")
     
     # Abre a planilha
     spreadsheet = client.open("Modelo_Orcamento_Inteligente")
@@ -18,17 +14,17 @@ try:
     os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
     
 except Exception as e:
-    st.error(f"Erro ao conectar com service-account.json: {e}")
+    st.error(f"Erro na conexão: {e}")
+    st.info("💡 Dica: Verifique se o e-mail que está dentro do 'service-account.json' tem permissão de Editor na sua planilha.")
     st.stop()
 
-# --- 2. INTERFACE DO APP ---
-st.title("📄 Sistema de Orçamentos & OS")
+# --- 2. INTERFACE E LÓGICA ---
+st.title("📄 Sistema de Orçamentos")
 
-# Carregar dados do Banco
+# Carrega dados
 df_db = pd.DataFrame(db_sheet.get_all_records())
 lista_itens = df_db["Nome do Item / Serviço"].tolist() if not df_db.empty else []
 
-# Inputs
 cliente = st.text_input("Nome do Cliente:")
 whatsapp = st.text_input("WhatsApp do Cliente:")
 
@@ -51,15 +47,12 @@ if st.button("➕ Adicionar"):
         db_sheet.append_row([nome_item, preco])
     st.rerun()
 
-# --- 3. EXIBIÇÃO E FINALIZAÇÃO ---
 if st.session_state.itens:
     df_orc = pd.DataFrame(st.session_state.itens)
     st.table(df_orc)
-    st.write(f"### Total: R$ {df_orc['Total'].sum():.2f}")
-    
     if st.button("💾 Finalizar"):
         for i in st.session_state.itens:
             os_sheet.append_row([datetime.now().strftime("%d/%m/%Y"), cliente, whatsapp, i["Desc"], i["Qtd"], i["Preco"], i["Total"]])
-        st.success("Orçamento salvo com sucesso!")
+        st.success("Salvo!")
         st.session_state.itens = []
         st.rerun()
