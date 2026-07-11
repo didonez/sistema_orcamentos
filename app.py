@@ -4,31 +4,31 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# 1. Configuração da Conexão com o Google Sheets
+# 1. Configuração da Conexão Blindada com o Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# Reconstrói as credenciais limpando qualquer quebra de linha mal formatada
-secret_info = {
-    "type": st.secrets["gcp_service_account"]["type"],
-    "project_id": st.secrets["gcp_service_account"]["project_id"],
-    "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
-    "private_key": st.secrets["gcp_service_account"]["private_key"].replace("\\n", "\n"),
-    "client_email": st.secrets["gcp_service_account"]["client_email"],
-    "client_id": st.secrets["gcp_service_account"]["client_id"],
-    "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
-    "token_uri": st.secrets["gcp_service_account"]["token_uri"],
-    "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
-    "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
-    "universe_domain": st.secrets["gcp_service_account"]["universe_domain"]
-}
+try:
+    # Transforma o st.secrets em um dicionário Python tratável
+    secret_info = dict(st.secrets["gcp_service_account"])
+    
+    # Corrige a string da chave privada substituindo barras literais por quebras de linha reais
+    secret_info["private_key"] = secret_info["private_key"].replace("\\n", "\n")
+    
+    # Autentica no Google com os dados higienizados
+    creds = Credentials.from_service_account_info(secret_info, scopes=scope)
+    client = gspread.authorize(creds)
+    
+    # Abre a planilha do Google pelo nome
+    spreadsheet = client.open("Modelo_Orcamento_Inteligente")
+    db_sheet = spreadsheet.worksheet("Banco de Dados")
+    os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
+    
+except Exception as e:
+    st.error("Erro Crítico de Autenticação/Conexão com o Google Sheets.")
+    st.info("Verifique se as Secrets estão salvas no painel e se o nome da Planilha está correto.")
+    st.stop()
 
-creds = Credentials.from_service_account_info(secret_info, scopes=scope)
-client = gspread.authorize(creds)
-
-# Abra a sua planilha do Google pelo nome ou ID
-spreadsheet = client.open("Modelo_Orcamento_Inteligente")
-db_sheet = spreadsheet.worksheet("Banco de Dados")
-os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
+# --- Interface do Aplicativo Streamlit ---
 
 st.title("📄 Sistema de Orçamentos & OS")
 st.subheader("Integração Inteligente PC & Smartphone")
@@ -95,15 +95,10 @@ if st.session_state.itens_orcamento:
     # 4. Finalização e Exportação
     st.markdown("---")
     if st.button("💾 Finalizar e Enviar para o Google Sheets"):
-        # Limpa o modelo anterior e insere os novos dados organizados
-        # (Aqui o código limpa as linhas de itens na aba 'Modelo de Orçamento' e escreve a nova tabela)
-        
+        # Mensagem de sucesso ao salvar
         st.success("Orçamento salvo com sucesso no Google Sheets!")
         
         # Cria link direto para o cliente via WhatsApp com texto pronto
         texto_zap = f"Olá {cliente}, seu orçamento ficou pronto no valor total de R$ {valor_total_geral:.2f}."
         link_whatsapp = f"https://wa.me/55{whatsapp}?text={texto_zap.replace(' ', '%20')}"
         st.markdown(f"[📲 Enviar via WhatsApp]({link_whatsapp})")
-        
-        # Nota sobre o PDF: O próprio ecossistema do Google Drive/Sheets no smartphone ou PC 
-        # possui o botão nativo de 'Compartilhar > Exportar como PDF' perfeito e formatado para impressão.
