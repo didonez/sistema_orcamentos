@@ -5,43 +5,74 @@ import json
 from datetime import datetime
 from google.oauth2.service_account import Credentials
 
-# --- 1. CONFIGURAÇÃO SEGURA (Injeção direta) ---
-# COLE O CONTEÚDO DO SEU JSON AQUI DENTRO DAS ASPAS TRIPLAS
-JSON_CONTENT = """
-{
-  "type": "service_account",
-  "project_id": "...",
-  "private_key_id": "...",
-  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
-  "client_email": "...",
-  "client_id": "...",
-  "auth_uri": "...",
-  "token_uri": "...",
-  "auth_provider_x509_cert_url": "...",
-  "client_x509_cert_url": "..."
+# --- 1. CONFIGURAÇÃO SEGURA DAS CREDENCIAIS ---
+# As credenciais estão injetadas diretamente para evitar erros de leitura de arquivos no GitHub
+SERVICE_ACCOUNT_INFO = {
+    "type": "service_account",
+    "project_id": "didodnes",
+    "private_key_id": "0d24d3b021b2ddc5bfe66a0d693afaacd1ab6990",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC9m9bQN92PiHVU\nWsS3kPdrVCQc2DBYI2lPaHpgXgcRvzLLESA2gECHY/t/I4d/R3tvzqgsxIQvaTlR\n2eP+SvshHCOd5wyraUPWrM8kwwexN9iS+fAkux/I3WTIt6s3rzbGSM6WyF6QZ2uZ\nezWM1ID0k/FjMR6ir1UvEKTR7t6keQX0a+/LyiCxdKhOhaLj0jqkspAHYPt/mLQZ\nIQJhh2Sah7AZDY3PYYhqcyQ2PPjl7yahojKLFsFnM667GVz+iBXIugpxli/94hT0\nL9JsA8ZkoHHwDCZW4D0PR/zYjPpv6C4v4RBJeM71uEB0BbQtXmbITXRsnB5FLdJi\nJxT5VocNAgMBAAECggEAAkEWj44tJQDh0uQWCk//vmJsitKVLI8V4vBNOCprWhjU\nVpljBn2FhuE3mGjd5Qj+sjMaSRdNslnwE7A2p4t7qzFFnnckmEBy99vrxeDzDUvV\nLYDUNpOU9VM7LgRlADn7OZCcXYA6A5cp2Sl1AbIgawf76t/RdeywuL5cFJ+K58NV\nVOSRy7cK/B2StV+bPh2GNx9n94krfQMO4KXXjQnvkZCDeHY76NjdX7gqmIApdwQP\nnxzQrvg911/QD6XA84I9Jon0Ik5TxgEtfdsByDe1aqqQsskZCGewmeUQ+tsNHgD/\n7kW9GnE2zaeHIVULKGZbgJaZT8dpCLlMmPuUbPqcbwKBgQDt3KznehoBUHO7+Ar7\nNWKN1IyBwS4UvBxaT7i7kx57ms3p1DzdizzsS6Fz4JSn2jdlg/H3dKaZIQBnnrQY\nO1Kyq/EgbpdaqBbFHEcfIr4pdo53X/wUHiavd73iImamxw3fZT3+nsDQPWrPLVQH\nr4b8mEAAXIBRUsiJlVolE6+KDwKBgQDMETUkJyNhT9hLeO3GmjJ0eOCJZG+RHXCr\nJXDA9XUkFYw0A7+lV6gfu/cYbpkMz9t3kmbBia0qpURGP3KY83Gf9+XFLtDPM9wD\nxZCoJqrDoZPNi3mm8nM9c4HufdjL5JyPiYb2qnM+/vFabsaKVx8gf9vDxyamTCVw\nWmebjGHpIwKBgCFavow/HQJuK6yCHdgYJlfJJGLVmgaiUj9/ymHTQYUHsjRF5LsU\nWVixSlSbe30GJpp/pCCVJP94FzxwjsSPHQuc/NUVbPfzdi3xxy9gidX6oAOxXAHe\nMIKOgfwB4u8kHpfi9IyN6m/JDP88Vfo17PHiz6a9UekVeLWCUf+9APKVAoGBAKkc\nrYRbZueTCrVo7uvCB4QcVD+n2wlQc3lxmqJeCAiyTrEgVibIoMxDsf8uUGmcq8zI\np51F4hrQQOdSVz7HqGcgQesJ5AOCf5ckl7+x45wh/+G770HZ9IR9f7TL1+kIeHI/\nT3iFQuJ21j7SRHiKwIHnU5FILhBsVC5qzSfLy6wvAoGAGuuTtUvY0z0EqDPhBBQ5\nOCwUpwtB6m7KZvEFHeSGkQfidhE5ONC90a0KxIiTtzPm40lWJRepH52NCgd4ZvQ6\nVNhlfB1hlH6VkM8aPlveP3tWKVnY1kxo1PI8Lq13PqKJU4E40d+87B3waui6nwbs\n8bhA6fIjicOERtLnrEuTRX8=\n-----END PRIVATE KEY-----",
+    "client_email": "sistema-orcamento@didodnes.iam.gserviceaccount.com",
+    "client_id": "116771399404527128589",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/sistema-orcamento%40didodnes.iam.gserviceaccount.com",
+    "universe_domain": "googleapis.com"
 }
-"""
 
+# --- 2. CONEXÃO COM O GOOGLE SHEETS ---
 try:
-    # Converte a string JSON para um dicionário real
-    creds_dict = json.loads(JSON_CONTENT)
-    
-    # Autentica usando o dicionário em memória (ignora corrupção de arquivos do GitHub)
     creds = Credentials.from_service_account_info(
-        creds_dict, 
+        SERVICE_ACCOUNT_INFO, 
         scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     )
     client = gspread.authorize(creds)
-    
-    # Conecta à planilha
     spreadsheet = client.open("Modelo_Orcamento_Inteligente")
     db_sheet = spreadsheet.worksheet("Banco de Dados")
     os_sheet = spreadsheet.worksheet("Modelo de Orçamento")
-    
 except Exception as e:
-    st.error(f"Erro na conexão: {e}")
+    st.error(f"Erro na conexão com o Google: {e}")
     st.stop()
 
-# --- 2. RESTANTE DO SEU CÓDIGO ---
-st.title("📄 Sistema de Orçamentos")
-# ... (continue com a lógica do seu app daqui para baixo)
+# --- 3. INTERFACE DO APP ---
+st.title("📄 Sistema de Orçamentos & OS")
+
+# Carrega lista de itens para auto-completar
+df_db = pd.DataFrame(db_sheet.get_all_records())
+lista_itens = df_db["Nome do Item / Serviço"].tolist() if not df_db.empty else []
+
+cliente = st.text_input("Nome do Cliente:")
+whatsapp = st.text_input("WhatsApp do Cliente:")
+
+if "itens" not in st.session_state: st.session_state.itens = []
+
+item_sel = st.selectbox("Selecione o item:", ["-- Novo Item --"] + lista_itens)
+
+if item_sel == "-- Novo Item --":
+    nome_item = st.text_input("Nome do novo equipamento ou serviço:")
+    preco = st.number_input("Preço Unitário (R$):", value=0.0, step=10.0)
+else:
+    nome_item = item_sel
+    preco = float(df_db[df_db["Nome do Item / Serviço"] == item_sel]["Preço Padrão (R$)"].values[0])
+
+qtd = st.number_input("Quantidade:", value=1, min_value=1)
+
+if st.button("➕ Adicionar Item"):
+    st.session_state.itens.append({"Desc": nome_item, "Qtd": qtd, "Preco": preco, "Total": qtd*preco})
+    if item_sel == "-- Novo Item --": 
+        db_sheet.append_row([nome_item, preco])
+    st.rerun()
+
+# --- 4. EXIBIÇÃO E SALVAMENTO ---
+if st.session_state.itens:
+    df_orc = pd.DataFrame(st.session_state.itens)
+    st.table(df_orc)
+    st.write(f"### 💰 Total Geral: R$ {df_orc['Total'].sum():.2f}")
+    
+    if st.button("💾 Finalizar Orçamento"):
+        for i in st.session_state.itens:
+            os_sheet.append_row([datetime.now().strftime("%d/%m/%Y"), cliente, whatsapp, i["Desc"], i["Qtd"], i["Preco"], i["Total"]])
+        st.success("Orçamento salvo no Google Sheets!")
+        st.session_state.itens = []
+        st.rerun()
